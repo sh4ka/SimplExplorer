@@ -1,0 +1,1164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; font-src https://cdnjs.cloudflare.com">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <title>File Browser</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    :root {
+      --bg-primary: #1e1e1e;
+      --bg-secondary: #252526;
+      --bg-tertiary: #2d2d30;
+      --bg-hover: #3e3e42;
+      --bg-selected: #094771;
+      --text-primary: #cccccc;
+      --text-secondary: #858585;
+      --border-color: #3e3e42;
+      --accent: #0078d4;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      height: 100vh;
+      overflow: hidden;
+      user-select: none;
+    }
+
+    /* Title bar drag region for macOS */
+    .titlebar {
+      -webkit-app-region: drag;
+      height: 52px;
+      background: var(--bg-secondary);
+      display: flex;
+      align-items: center;
+      padding-left: 80px;
+      padding-right: 16px;
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    .titlebar > * {
+      -webkit-app-region: no-drag;
+    }
+
+    /* Navigation */
+    .nav-buttons {
+      display: flex;
+      gap: 4px;
+      margin-right: 12px;
+    }
+
+    .nav-btn {
+      width: 32px;
+      height: 32px;
+      border: none;
+      background: transparent;
+      color: var(--text-primary);
+      border-radius: 6px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+      transition: background 0.15s;
+    }
+
+    .nav-btn:hover {
+      background: var(--bg-hover);
+    }
+
+    .nav-btn:disabled {
+      opacity: 0.3;
+      cursor: default;
+    }
+
+    .nav-btn:disabled:hover {
+      background: transparent;
+    }
+
+    .nav-btn.active {
+      background: var(--accent);
+      color: white;
+    }
+
+    /* Path bar */
+    .path-bar {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      background: var(--bg-tertiary);
+      border-radius: 6px;
+      padding: 0 12px;
+      height: 32px;
+      overflow: hidden;
+    }
+
+    .path-bar input {
+      flex: 1;
+      background: transparent;
+      border: none;
+      color: var(--text-primary);
+      font-size: 13px;
+      outline: none;
+    }
+
+    .open-folder-btn {
+      margin-left: 12px;
+      padding: 6px 14px;
+      background: var(--accent);
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 500;
+      transition: opacity 0.15s;
+    }
+
+    .open-folder-btn:hover {
+      opacity: 0.9;
+    }
+
+    /* Main content */
+    .main-content {
+      display: flex;
+      height: calc(100vh - 52px);
+    }
+
+    /* Sidebar */
+    .sidebar {
+      width: 220px;
+      background: var(--bg-secondary);
+      border-right: 1px solid var(--border-color);
+      padding: 8px 0;
+      overflow-y: auto;
+    }
+
+    .tree-item {
+      display: flex;
+      align-items: center;
+      padding: 4px 8px;
+      cursor: pointer;
+      transition: background 0.15s;
+      white-space: nowrap;
+    }
+
+    .tree-item:hover {
+      background: var(--bg-hover);
+    }
+
+    .tree-item.selected {
+      background: var(--bg-selected);
+    }
+
+    .tree-toggle {
+      width: 16px;
+      height: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 10px;
+      color: var(--text-secondary);
+      flex-shrink: 0;
+      transition: transform 0.15s ease;
+    }
+
+    .tree-toggle.expanded {
+      transform: rotate(90deg);
+    }
+
+    .tree-icon {
+      font-size: 14px;
+      margin-right: 6px;
+      flex-shrink: 0;
+      color: #5AC8FA;
+    }
+
+    .tree-label {
+      font-size: 13px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .tree-children {
+      display: none;
+    }
+
+    .tree-children.expanded {
+      display: block;
+    }
+
+    /* File list */
+    .file-list-container {
+      flex: 1;
+      overflow-y: auto;
+      padding: 8px;
+    }
+
+    .file-list {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .file-item {
+      display: flex;
+      align-items: center;
+      padding: 8px 12px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+
+    .file-item:hover {
+      background: var(--bg-hover);
+    }
+
+    .file-item.selected {
+      background: var(--bg-selected);
+    }
+
+    .file-icon {
+      width: 32px;
+      height: 32px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-right: 12px;
+      font-size: 24px;
+    }
+
+    .file-icon .fa-folder {
+      color: #5AC8FA;
+    }
+
+    .file-info {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .file-name {
+      font-size: 13px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .file-name.hidden-file {
+      color: var(--text-secondary);
+    }
+
+    .file-meta {
+      font-size: 11px;
+      color: var(--text-secondary);
+      margin-top: 2px;
+    }
+
+    .file-size {
+      width: 80px;
+      text-align: right;
+      font-size: 12px;
+      color: var(--text-secondary);
+    }
+
+    .file-date {
+      width: 140px;
+      text-align: right;
+      font-size: 12px;
+      color: var(--text-secondary);
+    }
+
+    /* Empty state */
+    .empty-state {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      color: var(--text-secondary);
+    }
+
+    .empty-state .icon {
+      font-size: 48px;
+      margin-bottom: 16px;
+      opacity: 0.5;
+    }
+
+    /* Loading state */
+    .loading {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      color: var(--text-secondary);
+    }
+
+    /* Error state */
+    .error-message {
+      background: #5a1d1d;
+      color: #f48771;
+      padding: 12px 16px;
+      border-radius: 6px;
+      margin: 8px;
+      font-size: 13px;
+    }
+
+    /* Status bar */
+    .status-bar {
+      height: 24px;
+      background: var(--bg-secondary);
+      border-top: 1px solid var(--border-color);
+      display: flex;
+      align-items: center;
+      padding: 0 16px;
+      font-size: 12px;
+      color: var(--text-secondary);
+    }
+
+    /* Scrollbar styling */
+    ::-webkit-scrollbar {
+      width: 10px;
+      height: 10px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: var(--bg-hover);
+      border-radius: 5px;
+      border: 2px solid transparent;
+      background-clip: padding-box;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+      background: #555;
+      border: 2px solid transparent;
+      background-clip: padding-box;
+    }
+
+    /* Context Menu */
+    .context-menu {
+      position: fixed;
+      background: var(--bg-secondary);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 4px 0;
+      min-width: 180px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+      z-index: 1000;
+      display: none;
+    }
+
+    .context-menu.visible {
+      display: block;
+    }
+
+    .context-menu-item {
+      padding: 8px 16px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 13px;
+    }
+
+    .context-menu-item:hover {
+      background: var(--bg-hover);
+    }
+
+    .context-menu-item.disabled {
+      opacity: 0.4;
+      pointer-events: none;
+    }
+
+    .context-menu-separator {
+      height: 1px;
+      background: var(--border-color);
+      margin: 4px 0;
+    }
+
+    .context-menu-item .shortcut {
+      margin-left: auto;
+      color: var(--text-secondary);
+      font-size: 11px;
+    }
+
+    /* Properties Modal */
+    .modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.5);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 2000;
+    }
+
+    .modal-overlay.visible {
+      display: flex;
+    }
+
+    .modal {
+      background: var(--bg-secondary);
+      border-radius: 12px;
+      padding: 24px;
+      min-width: 350px;
+      max-width: 450px;
+      box-shadow: 0 16px 48px rgba(0, 0, 0, 0.5);
+    }
+
+    .modal-title {
+      font-size: 16px;
+      font-weight: 600;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .modal-row {
+      display: flex;
+      padding: 8px 0;
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    .modal-label {
+      width: 100px;
+      color: var(--text-secondary);
+      font-size: 13px;
+    }
+
+    .modal-value {
+      flex: 1;
+      font-size: 13px;
+      word-break: break-all;
+    }
+
+    .modal-buttons {
+      margin-top: 20px;
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+    }
+
+    .modal-btn {
+      padding: 8px 16px;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 13px;
+    }
+
+    .modal-btn-primary {
+      background: var(--accent);
+      color: white;
+    }
+
+    /* Rename input */
+    .rename-input {
+      background: var(--bg-tertiary);
+      border: 2px solid var(--accent);
+      color: var(--text-primary);
+      padding: 4px 8px;
+      font-size: 13px;
+      border-radius: 4px;
+      outline: none;
+      width: 100%;
+    }
+  </style>
+</head>
+<body>
+  <div class="titlebar">
+    <div class="nav-buttons">
+      <button class="nav-btn" id="btn-back" title="Back" disabled>←</button>
+      <button class="nav-btn" id="btn-forward" title="Forward" disabled>→</button>
+      <button class="nav-btn" id="btn-up" title="Go to parent folder">↑</button>
+    </div>
+    <div class="path-bar">
+      <input type="text" id="path-input" placeholder="Enter path...">
+    </div>
+    <button class="nav-btn" id="btn-hidden" title="Toggle hidden files"><i class="fa-solid fa-eye"></i></button>
+    <button class="open-folder-btn" id="btn-open">Open Folder</button>
+  </div>
+
+  <div class="main-content">
+    <div class="sidebar" id="sidebar-tree">
+    </div>
+
+    <div class="file-list-container" id="file-list-container">
+      <div class="loading">Loading...</div>
+    </div>
+  </div>
+
+  <div class="status-bar" id="status-bar">
+    Ready
+  </div>
+
+  <!-- Context Menu -->
+  <div class="context-menu" id="context-menu">
+    <div class="context-menu-item" data-action="open">Open</div>
+    <div class="context-menu-separator"></div>
+    <div class="context-menu-item" data-action="cut">Cut<span class="shortcut">⌘X</span></div>
+    <div class="context-menu-item" data-action="copy">Copy<span class="shortcut">⌘C</span></div>
+    <div class="context-menu-item" data-action="paste">Paste<span class="shortcut">⌘V</span></div>
+    <div class="context-menu-separator"></div>
+    <div class="context-menu-item" data-action="rename">Rename</div>
+    <div class="context-menu-item" data-action="delete">Move to Trash<span class="shortcut">⌘⌫</span></div>
+    <div class="context-menu-separator"></div>
+    <div class="context-menu-item" data-action="properties">Properties</div>
+  </div>
+
+  <!-- Properties Modal -->
+  <div class="modal-overlay" id="properties-modal">
+    <div class="modal">
+      <div class="modal-title" id="properties-title"><i class="fa-solid fa-file"></i> Properties</div>
+      <div id="properties-content"></div>
+      <div class="modal-buttons">
+        <button class="modal-btn modal-btn-primary" id="properties-close">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // State
+    let currentPath = '';
+    let homeDir = '';
+    let history = [];
+    let historyIndex = -1;
+    let selectedItem = null;
+    let showHidden = false;
+    let clipboard = { item: null, action: null }; // action: 'copy' or 'cut'
+    let contextTarget = null;
+
+    // Elements
+    const pathInput = document.getElementById('path-input');
+    const fileListContainer = document.getElementById('file-list-container');
+    const statusBar = document.getElementById('status-bar');
+    const btnBack = document.getElementById('btn-back');
+    const btnForward = document.getElementById('btn-forward');
+    const btnUp = document.getElementById('btn-up');
+    const btnHidden = document.getElementById('btn-hidden');
+    const btnOpen = document.getElementById('btn-open');
+    const sidebarTree = document.getElementById('sidebar-tree');
+    const contextMenu = document.getElementById('context-menu');
+    const propertiesModal = document.getElementById('properties-modal');
+    const propertiesTitle = document.getElementById('properties-title');
+    const propertiesContent = document.getElementById('properties-content');
+    const propertiesClose = document.getElementById('properties-close');
+
+    // Tree state
+    const expandedPaths = new Set();
+
+    // Icon mapping (Font Awesome classes)
+    const iconMap = {
+      folder: 'fa-solid fa-folder',
+      image: 'fa-solid fa-image',
+      pdf: 'fa-solid fa-file-pdf',
+      document: 'fa-solid fa-file-word',
+      text: 'fa-solid fa-file-lines',
+      code: 'fa-solid fa-file-code',
+      archive: 'fa-solid fa-file-zipper',
+      audio: 'fa-solid fa-file-audio',
+      video: 'fa-solid fa-file-video',
+      app: 'fa-solid fa-gear',
+      file: 'fa-solid fa-file'
+    };
+
+    // Context Menu Functions
+    function showContextMenu(e, item) {
+      e.preventDefault();
+      contextTarget = item;
+
+      // Update paste state
+      const pasteItem = contextMenu.querySelector('[data-action="paste"]');
+      pasteItem.classList.toggle('disabled', !clipboard.item);
+
+      // Position menu
+      const x = Math.min(e.clientX, window.innerWidth - 200);
+      const y = Math.min(e.clientY, window.innerHeight - 300);
+      contextMenu.style.left = `${x}px`;
+      contextMenu.style.top = `${y}px`;
+      contextMenu.classList.add('visible');
+    }
+
+    function hideContextMenu() {
+      contextMenu.classList.remove('visible');
+      contextTarget = null;
+    }
+
+    async function handleContextAction(action) {
+      if (!contextTarget && action !== 'paste') return;
+
+      switch (action) {
+        case 'open':
+          if (contextTarget.isDirectory) {
+            await navigateTo(contextTarget.path);
+          } else {
+            await window.fileAPI.openFile(contextTarget.path);
+          }
+          break;
+
+        case 'copy':
+          clipboard = { item: contextTarget, action: 'copy' };
+          statusBar.textContent = `Copied: ${contextTarget.name}`;
+          break;
+
+        case 'cut':
+          clipboard = { item: contextTarget, action: 'cut' };
+          statusBar.textContent = `Cut: ${contextTarget.name}`;
+          break;
+
+        case 'paste':
+          if (clipboard.item) {
+            const destPath = `${currentPath}/${clipboard.item.name}`;
+            let result;
+            if (clipboard.action === 'copy') {
+              result = await window.fileAPI.copyItem(clipboard.item.path, destPath);
+              if (result.success) {
+                statusBar.textContent = `Copied to ${currentPath}`;
+              }
+            } else {
+              result = await window.fileAPI.moveItem(clipboard.item.path, destPath);
+              if (result.success) {
+                statusBar.textContent = `Moved to ${currentPath}`;
+                clipboard = { item: null, action: null };
+              }
+            }
+            if (result.success) {
+              await navigateTo(currentPath);
+            } else {
+              statusBar.textContent = `Error: ${result.error}`;
+            }
+          }
+          break;
+
+        case 'rename':
+          startRename(contextTarget);
+          break;
+
+        case 'delete':
+          const deleteItemPath = contextTarget.path;
+          const deleteItemName = contextTarget.name;
+          const deleteParentPath = await window.fileAPI.getParentDir(deleteItemPath);
+          if (confirm(`Move "${deleteItemName}" to Trash?`)) {
+            const result = await window.fileAPI.trashItem(deleteItemPath);
+            if (result.success) {
+              statusBar.textContent = `Moved to Trash: ${deleteItemName}`;
+              currentPath = deleteParentPath;
+              await navigateTo(deleteParentPath);
+            } else {
+              statusBar.textContent = `Error: ${result.error}`;
+            }
+          }
+          break;
+
+        case 'properties':
+          await showProperties(contextTarget);
+          break;
+      }
+
+      hideContextMenu();
+    }
+
+    function startRename(item) {
+      const itemEl = fileListContainer.querySelector(`[data-path="${CSS.escape(item.path)}"]`);
+      if (!itemEl) return;
+
+      const nameEl = itemEl.querySelector('.file-name');
+      const originalName = item.name;
+
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.className = 'rename-input';
+      input.value = originalName;
+
+      // Select name without extension for files
+      const dotIndex = originalName.lastIndexOf('.');
+      const selectEnd = (!item.isDirectory && dotIndex > 0) ? dotIndex : originalName.length;
+
+      nameEl.innerHTML = '';
+      nameEl.appendChild(input);
+      input.focus();
+      input.setSelectionRange(0, selectEnd);
+
+      const finishRename = async (save) => {
+        const newName = input.value.trim();
+        if (save && newName && newName !== originalName) {
+          const newPath = item.path.replace(/[^/]+$/, newName);
+          const result = await window.fileAPI.renameItem(item.path, newPath);
+          if (result.success) {
+            await navigateTo(currentPath);
+            statusBar.textContent = `Renamed to: ${newName}`;
+          } else {
+            statusBar.textContent = `Error: ${result.error}`;
+            nameEl.textContent = originalName;
+          }
+        } else {
+          nameEl.textContent = originalName;
+        }
+      };
+
+      input.addEventListener('blur', () => finishRename(true));
+      input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          input.blur();
+        } else if (e.key === 'Escape') {
+          finishRename(false);
+        }
+      });
+    }
+
+    async function showProperties(item) {
+      const iconClass = item.isDirectory ? 'fa-folder' : 'fa-file';
+      propertiesTitle.innerHTML = `<i class="fa-solid ${iconClass}"></i> ${escapeHtml(item.name)}`;
+
+      const stats = await window.fileAPI.getFileStats(item.path);
+
+      propertiesContent.innerHTML = `
+        <div class="modal-row">
+          <span class="modal-label">Name</span>
+          <span class="modal-value">${escapeHtml(item.name)}</span>
+        </div>
+        <div class="modal-row">
+          <span class="modal-label">Path</span>
+          <span class="modal-value">${escapeHtml(item.path)}</span>
+        </div>
+        <div class="modal-row">
+          <span class="modal-label">Type</span>
+          <span class="modal-value">${item.isDirectory ? 'Folder' : 'File'}</span>
+        </div>
+        <div class="modal-row">
+          <span class="modal-label">Size</span>
+          <span class="modal-value">${item.isDirectory ? '—' : formatSize(stats.size)}</span>
+        </div>
+        <div class="modal-row">
+          <span class="modal-label">Created</span>
+          <span class="modal-value">${formatDate(stats.created)}</span>
+        </div>
+        <div class="modal-row">
+          <span class="modal-label">Modified</span>
+          <span class="modal-value">${formatDate(stats.modified)}</span>
+        </div>
+      `;
+
+      propertiesModal.classList.add('visible');
+    }
+
+    // Initialize
+    async function init() {
+      try {
+        setupEventListeners();
+        homeDir = await window.fileAPI.getHomeDir();
+        await initTree();
+        await navigateTo(homeDir);
+      } catch (error) {
+        fileListContainer.innerHTML = `<div class="error-message">Failed to initialize: ${error.message}</div>`;
+      }
+    }
+
+    // Initialize the directory tree
+    async function initTree() {
+      // Start with root
+      await renderTreeNode('/', sidebarTree, 0);
+      // Auto-expand to home directory
+      await expandToPath(homeDir);
+    }
+
+    // Expand tree to show a specific path
+    async function expandToPath(targetPath) {
+      const parts = targetPath.split('/').filter(p => p);
+      let currentPath = '/';
+
+      for (const part of parts) {
+        currentPath = currentPath === '/' ? `/${part}` : `${currentPath}/${part}`;
+
+        // Find the node for this path
+        const node = sidebarTree.querySelector(`[data-path="${CSS.escape(currentPath)}"]`);
+        if (node) {
+          // Expand this node if not already expanded
+          const childrenEl = node.querySelector('.tree-children');
+          if (childrenEl && !childrenEl.classList.contains('expanded')) {
+            await toggleTreeNode(node, true);
+          }
+        }
+      }
+    }
+
+    // Render a tree node
+    async function renderTreeNode(nodePath, container, depth) {
+      try {
+        const result = await window.fileAPI.readDirectory(nodePath);
+        if (!result.success) return;
+
+        let folders = result.items.filter(item => item.isDirectory);
+        if (!showHidden) {
+          folders = folders.filter(item => !item.name.startsWith('.'));
+        }
+
+        for (const folder of folders) {
+          const nodeEl = document.createElement('div');
+          nodeEl.className = 'tree-node';
+          nodeEl.dataset.path = folder.path;
+
+          const itemEl = document.createElement('div');
+          itemEl.className = 'tree-item';
+          itemEl.style.paddingLeft = `${8 + depth * 16}px`;
+
+          const hasChildren = true; // Assume folders might have children
+
+          itemEl.innerHTML = `
+            <span class="tree-toggle">${hasChildren ? '<i class="fa-solid fa-chevron-right"></i>' : ''}</span>
+            <span class="tree-icon"><i class="fa-solid fa-folder"></i></span>
+            <span class="tree-label">${escapeHtml(folder.name)}</span>
+          `;
+
+          itemEl.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            hideContextMenu();
+
+            // Update selection
+            sidebarTree.querySelectorAll('.tree-item').forEach(el => el.classList.remove('selected'));
+            itemEl.classList.add('selected');
+
+            // Toggle expansion (expand if collapsed, collapse if expanded)
+            await toggleTreeNode(nodeEl);
+
+            // Navigate to this folder (don't auto-expand tree since we just toggled it)
+            await navigateTo(folder.path, true, false);
+          });
+
+          itemEl.addEventListener('contextmenu', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            // Select the item
+            sidebarTree.querySelectorAll('.tree-item').forEach(el => el.classList.remove('selected'));
+            itemEl.classList.add('selected');
+            selectedItem = folder;
+            showContextMenu(e, folder);
+          });
+
+          nodeEl.appendChild(itemEl);
+
+          const childrenEl = document.createElement('div');
+          childrenEl.className = 'tree-children';
+          nodeEl.appendChild(childrenEl);
+
+          container.appendChild(nodeEl);
+        }
+      } catch (error) {
+        // Silently handle tree rendering errors
+      }
+    }
+
+    // Update tree selection to highlight current path
+    function updateTreeSelection(targetPath) {
+      sidebarTree.querySelectorAll('.tree-item').forEach(el => el.classList.remove('selected'));
+      const node = sidebarTree.querySelector(`[data-path="${CSS.escape(targetPath)}"]`);
+      if (node) {
+        const treeItem = node.querySelector('.tree-item');
+        if (treeItem) {
+          treeItem.classList.add('selected');
+        }
+      }
+    }
+
+    // Toggle tree node expansion
+    async function toggleTreeNode(nodeEl, forceExpand = false) {
+      const path = nodeEl.dataset.path;
+      const toggle = nodeEl.querySelector('.tree-toggle');
+      const childrenEl = nodeEl.querySelector('.tree-children');
+
+      if (!childrenEl) return;
+
+      const isExpanded = childrenEl.classList.contains('expanded');
+
+      if (isExpanded && !forceExpand) {
+        childrenEl.classList.remove('expanded');
+        toggle.classList.remove('expanded');
+        expandedPaths.delete(path);
+      } else if (!isExpanded) {
+        // Load children if not already loaded
+        if (childrenEl.children.length === 0) {
+          const depth = (path.match(/\//g) || []).length;
+          await renderTreeNode(path, childrenEl, depth);
+        }
+        childrenEl.classList.add('expanded');
+        toggle.classList.add('expanded');
+        expandedPaths.add(path);
+      }
+    }
+
+    // Toggle hidden files visibility
+    async function toggleHiddenFiles() {
+      showHidden = !showHidden;
+      btnHidden.classList.toggle('active', showHidden);
+      btnHidden.title = showHidden ? 'Hide hidden files' : 'Show hidden files';
+
+      // Refresh tree and current view
+      sidebarTree.innerHTML = '';
+      expandedPaths.clear();
+      await initTree();
+      await navigateTo(currentPath);
+    }
+
+    function setupEventListeners() {
+      // Navigation buttons
+      btnBack.addEventListener('click', goBack);
+      btnForward.addEventListener('click', goForward);
+      btnUp.addEventListener('click', goUp);
+      btnHidden.addEventListener('click', toggleHiddenFiles);
+      btnOpen.addEventListener('click', openFolderDialog);
+
+      // Path input
+      pathInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          navigateTo(pathInput.value);
+        }
+      });
+
+      // Keyboard navigation
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Backspace' && document.activeElement !== pathInput) {
+          e.preventDefault();
+          goUp();
+        }
+      });
+
+      // Context menu
+      document.addEventListener('click', hideContextMenu);
+      contextMenu.addEventListener('click', (e) => {
+        const item = e.target.closest('.context-menu-item');
+        if (item && !item.classList.contains('disabled')) {
+          handleContextAction(item.dataset.action);
+        }
+      });
+
+      // Properties modal
+      propertiesClose.addEventListener('click', () => {
+        propertiesModal.classList.remove('visible');
+      });
+      propertiesModal.addEventListener('click', (e) => {
+        if (e.target === propertiesModal) {
+          propertiesModal.classList.remove('visible');
+        }
+      });
+
+      // Keyboard shortcuts
+      document.addEventListener('keydown', (e) => {
+        if (e.metaKey && selectedItem) {
+          if (e.key === 'c') {
+            clipboard = { item: selectedItem, action: 'copy' };
+            statusBar.textContent = `Copied: ${selectedItem.name}`;
+          } else if (e.key === 'x') {
+            clipboard = { item: selectedItem, action: 'cut' };
+            statusBar.textContent = `Cut: ${selectedItem.name}`;
+          }
+        }
+        if (e.metaKey && e.key === 'v' && clipboard.item) {
+          e.preventDefault();
+          contextTarget = selectedItem;
+          handleContextAction('paste');
+        }
+        if (e.metaKey && e.key === 'Backspace' && selectedItem) {
+          e.preventDefault();
+          contextTarget = selectedItem;
+          handleContextAction('delete');
+        }
+      });
+    }
+
+    async function navigateTo(path, addToHistory = true, expandTree = true) {
+      if (!path) return;
+
+      fileListContainer.innerHTML = '<div class="loading">Loading...</div>';
+      pathInput.value = path;
+
+      try {
+        const result = await window.fileAPI.readDirectory(path);
+
+        if (result.success) {
+          currentPath = result.path;
+          pathInput.value = currentPath;
+
+          if (addToHistory) {
+            // Trim forward history if we're navigating from middle
+            if (historyIndex < history.length - 1) {
+              history = history.slice(0, historyIndex + 1);
+            }
+            history.push(currentPath);
+            historyIndex = history.length - 1;
+          }
+
+          await renderFileList(result.items);
+          updateNavigationButtons();
+          // Filter for status bar count
+          const displayItems = showHidden ? result.items : result.items.filter(i => !i.name.startsWith('.'));
+          updateStatusBar(displayItems);
+
+          // Expand tree to current path and highlight (skip if navigating from tree)
+          if (expandTree) {
+            await expandToPath(currentPath);
+          }
+          updateTreeSelection(currentPath);
+        } else {
+          fileListContainer.innerHTML = `<div class="error-message">Error: ${result.error}</div>`;
+        }
+      } catch (error) {
+        fileListContainer.innerHTML = `<div class="error-message">Error: ${error.message}</div>`;
+      }
+    }
+
+    async function renderFileList(items) {
+      // Filter hidden files if needed
+      let displayItems = items;
+      if (!showHidden) {
+        displayItems = items.filter(item => !item.name.startsWith('.'));
+      }
+
+      if (displayItems.length === 0) {
+        fileListContainer.innerHTML = `
+          <div class="empty-state">
+            <span class="icon">📂</span>
+            <span>This folder is empty</span>
+          </div>
+        `;
+        return;
+      }
+
+      const fileList = document.createElement('div');
+      fileList.className = 'file-list';
+
+      for (const item of displayItems) {
+        const iconType = await window.fileAPI.getFileIconType(item.name, item.isDirectory);
+        const icon = iconMap[iconType] || iconMap.file;
+        
+        const itemEl = document.createElement('div');
+        itemEl.className = 'file-item';
+        itemEl.dataset.path = item.path;
+        itemEl.dataset.isDirectory = item.isDirectory;
+        
+        const isHidden = item.name.startsWith('.');
+        
+        itemEl.innerHTML = `
+          <div class="file-icon"><i class="${icon}"></i></div>
+          <div class="file-info">
+            <div class="file-name ${isHidden ? 'hidden-file' : ''}">${escapeHtml(item.name)}</div>
+          </div>
+          <div class="file-size">${item.isDirectory ? '—' : formatSize(item.size)}</div>
+          <div class="file-date">${formatDate(item.modified)}</div>
+        `;
+
+        itemEl.addEventListener('click', (e) => {
+          document.querySelectorAll('.file-item').forEach(el => el.classList.remove('selected'));
+          itemEl.classList.add('selected');
+          selectedItem = item;
+        });
+
+        itemEl.addEventListener('dblclick', () => {
+          if (item.isDirectory) {
+            navigateTo(item.path);
+          } else {
+            window.fileAPI.openFile(item.path);
+          }
+        });
+
+        itemEl.addEventListener('contextmenu', (e) => {
+          document.querySelectorAll('.file-item').forEach(el => el.classList.remove('selected'));
+          itemEl.classList.add('selected');
+          selectedItem = item;
+          showContextMenu(e, item);
+        });
+
+        fileList.appendChild(itemEl);
+      }
+
+      fileListContainer.innerHTML = '';
+      fileListContainer.appendChild(fileList);
+    }
+
+    function goBack() {
+      if (historyIndex > 0) {
+        historyIndex--;
+        navigateTo(history[historyIndex], false);
+      }
+    }
+
+    function goForward() {
+      if (historyIndex < history.length - 1) {
+        historyIndex++;
+        navigateTo(history[historyIndex], false);
+      }
+    }
+
+    async function goUp() {
+      const parentPath = await window.fileAPI.getParentDir(currentPath);
+      if (parentPath !== currentPath) {
+        navigateTo(parentPath);
+      }
+    }
+
+    async function openFolderDialog() {
+      const path = await window.fileAPI.openFolderDialog();
+      if (path) {
+        navigateTo(path);
+      }
+    }
+
+    function updateNavigationButtons() {
+      btnBack.disabled = historyIndex <= 0;
+      btnForward.disabled = historyIndex >= history.length - 1;
+      btnUp.disabled = currentPath === '/';
+    }
+
+    function updateStatusBar(items) {
+      const folders = items.filter(i => i.isDirectory).length;
+      const files = items.length - folders;
+      statusBar.textContent = `${items.length} items (${folders} folders, ${files} files)`;
+    }
+
+    // Utilities
+    function formatSize(bytes) {
+      if (bytes === 0) return '0 B';
+      const k = 1024;
+      const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+      const i = Math.floor(Math.log(bytes) / Math.log(k));
+      return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+    }
+
+    function formatDate(dateStr) {
+      const date = new Date(dateStr);
+      return date.toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    }
+
+    function escapeHtml(str) {
+      const div = document.createElement('div');
+      div.textContent = str;
+      return div.innerHTML;
+    }
+
+    // Start the app
+    init();
+  </script>
+</body>
+</html>

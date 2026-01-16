@@ -1,0 +1,731 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SimplExplorer - A Modern File Browser for macOS</title>
+  <meta name="description" content="SimplExplorer is a fast, lightweight file browser for macOS with a clean interface, directory tree navigation, and powerful file management features.">
+  <link rel="icon" type="image/png" href="assets/favicon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    :root {
+      --bg-dark: #0a0a0a;
+      --bg-card: #141414;
+      --bg-card-hover: #1a1a1a;
+      --accent: #0078d4;
+      --accent-light: #2899ff;
+      --text-primary: #ffffff;
+      --text-secondary: #888888;
+      --border: #2a2a2a;
+      --gradient-start: #0078d4;
+      --gradient-end: #00c6ff;
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: var(--bg-dark);
+      color: var(--text-primary);
+      line-height: 1.6;
+    }
+
+    /* Navigation */
+    nav {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      padding: 20px 40px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: rgba(10, 10, 10, 0.8);
+      backdrop-filter: blur(20px);
+      z-index: 100;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .logo {
+      font-size: 24px;
+      font-weight: 700;
+      background: linear-gradient(135deg, var(--gradient-start), var(--gradient-end));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .nav-links {
+      display: flex;
+      gap: 32px;
+    }
+
+    .nav-links a {
+      color: var(--text-secondary);
+      text-decoration: none;
+      font-size: 14px;
+      font-weight: 500;
+      transition: color 0.2s;
+    }
+
+    .nav-links a:hover {
+      color: var(--text-primary);
+    }
+
+    .download-btn {
+      background: var(--accent);
+      color: white;
+      padding: 10px 24px;
+      border-radius: 8px;
+      text-decoration: none;
+      font-weight: 600;
+      font-size: 14px;
+      transition: background 0.2s;
+    }
+
+    .download-btn:hover {
+      background: var(--accent-light);
+    }
+
+    /* Hero Section */
+    .hero {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      text-align: center;
+      padding: 120px 40px 80px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .hero::before {
+      content: '';
+      position: absolute;
+      top: -50%;
+      left: -50%;
+      width: 200%;
+      height: 200%;
+      background: radial-gradient(circle at 50% 50%, rgba(0, 120, 212, 0.1) 0%, transparent 50%);
+      animation: pulse 8s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { transform: scale(1); opacity: 0.5; }
+      50% { transform: scale(1.1); opacity: 0.8; }
+    }
+
+    .hero-content {
+      position: relative;
+      z-index: 1;
+      max-width: 800px;
+    }
+
+    .badge {
+      display: inline-block;
+      background: rgba(0, 120, 212, 0.2);
+      color: var(--accent-light);
+      padding: 8px 16px;
+      border-radius: 20px;
+      font-size: 13px;
+      font-weight: 600;
+      margin-bottom: 24px;
+      border: 1px solid rgba(0, 120, 212, 0.3);
+    }
+
+    .hero h1 {
+      font-size: 64px;
+      font-weight: 700;
+      line-height: 1.1;
+      margin-bottom: 24px;
+      background: linear-gradient(135deg, #fff 0%, #888 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .hero p {
+      font-size: 20px;
+      color: var(--text-secondary);
+      margin-bottom: 40px;
+      max-width: 600px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+
+    .hero-buttons {
+      display: flex;
+      gap: 16px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, var(--gradient-start), var(--gradient-end));
+      color: white;
+      padding: 16px 32px;
+      border-radius: 12px;
+      text-decoration: none;
+      font-weight: 600;
+      font-size: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 10px 40px rgba(0, 120, 212, 0.3);
+    }
+
+    .btn-secondary {
+      background: var(--bg-card);
+      color: var(--text-primary);
+      padding: 16px 32px;
+      border-radius: 12px;
+      text-decoration: none;
+      font-weight: 600;
+      font-size: 16px;
+      border: 1px solid var(--border);
+      transition: background 0.2s, border-color 0.2s;
+    }
+
+    .btn-secondary:hover {
+      background: var(--bg-card-hover);
+      border-color: var(--text-secondary);
+    }
+
+    /* App Preview */
+    .app-preview {
+      margin-top: 60px;
+      position: relative;
+      z-index: 1;
+    }
+
+    .app-window {
+      background: #1e1e1e;
+      border-radius: 12px;
+      box-shadow: 0 40px 100px rgba(0, 0, 0, 0.5);
+      overflow: hidden;
+      max-width: 900px;
+      margin: 0 auto;
+      border: 1px solid var(--border);
+    }
+
+    .app-titlebar {
+      background: #252526;
+      padding: 12px 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .window-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+    }
+
+    .dot-red { background: #ff5f57; }
+    .dot-yellow { background: #ffbd2e; }
+    .dot-green { background: #28ca42; }
+
+    .app-content {
+      display: flex;
+      height: 400px;
+    }
+
+    .app-sidebar {
+      width: 200px;
+      background: #252526;
+      padding: 16px;
+      border-right: 1px solid #3e3e42;
+    }
+
+    .sidebar-item {
+      padding: 8px 12px;
+      border-radius: 6px;
+      margin-bottom: 4px;
+      color: #ccc;
+      font-size: 13px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .sidebar-item.active {
+      background: #094771;
+    }
+
+    .app-files {
+      flex: 1;
+      padding: 16px;
+    }
+
+    .file-row {
+      display: flex;
+      align-items: center;
+      padding: 10px 12px;
+      border-radius: 6px;
+      margin-bottom: 4px;
+      color: #ccc;
+      font-size: 13px;
+    }
+
+    .file-row:hover {
+      background: #3e3e42;
+    }
+
+    .file-icon {
+      margin-right: 12px;
+      font-size: 18px;
+    }
+
+    .file-name {
+      flex: 1;
+    }
+
+    .file-meta {
+      color: #858585;
+      font-size: 12px;
+    }
+
+    /* Features Section */
+    .features {
+      padding: 120px 40px;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    .section-title {
+      text-align: center;
+      margin-bottom: 60px;
+    }
+
+    .section-title h2 {
+      font-size: 48px;
+      font-weight: 700;
+      margin-bottom: 16px;
+    }
+
+    .section-title p {
+      font-size: 18px;
+      color: var(--text-secondary);
+    }
+
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 24px;
+    }
+
+    .feature-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 32px;
+      transition: transform 0.2s, border-color 0.2s;
+    }
+
+    .feature-card:hover {
+      transform: translateY(-4px);
+      border-color: var(--accent);
+    }
+
+    .feature-icon {
+      font-size: 40px;
+      margin-bottom: 20px;
+    }
+
+    .feature-card h3 {
+      font-size: 20px;
+      font-weight: 600;
+      margin-bottom: 12px;
+    }
+
+    .feature-card p {
+      color: var(--text-secondary);
+      font-size: 15px;
+    }
+
+    /* Keyboard Shortcuts Section */
+    .shortcuts {
+      padding: 120px 40px;
+      background: var(--bg-card);
+    }
+
+    .shortcuts-content {
+      max-width: 1000px;
+      margin: 0 auto;
+    }
+
+    .shortcuts-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 16px;
+      margin-top: 40px;
+    }
+
+    .shortcut-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 20px;
+      background: var(--bg-dark);
+      border-radius: 10px;
+      border: 1px solid var(--border);
+    }
+
+    .shortcut-label {
+      font-size: 14px;
+    }
+
+    .shortcut-keys {
+      display: flex;
+      gap: 4px;
+    }
+
+    .key {
+      background: #2a2a2a;
+      padding: 6px 10px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      border: 1px solid #3a3a3a;
+    }
+
+    /* CTA Section */
+    .cta {
+      padding: 120px 40px;
+      text-align: center;
+    }
+
+    .cta-content {
+      max-width: 600px;
+      margin: 0 auto;
+    }
+
+    .cta h2 {
+      font-size: 40px;
+      font-weight: 700;
+      margin-bottom: 16px;
+    }
+
+    .cta p {
+      font-size: 18px;
+      color: var(--text-secondary);
+      margin-bottom: 32px;
+    }
+
+    /* Footer */
+    footer {
+      padding: 40px;
+      border-top: 1px solid var(--border);
+      text-align: center;
+      color: var(--text-secondary);
+      font-size: 14px;
+    }
+
+    footer a {
+      color: var(--accent-light);
+      text-decoration: none;
+    }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+      nav {
+        padding: 16px 20px;
+      }
+
+      .nav-links {
+        display: none;
+      }
+
+      .hero h1 {
+        font-size: 40px;
+      }
+
+      .hero p {
+        font-size: 16px;
+      }
+
+      .app-content {
+        height: 300px;
+      }
+
+      .app-sidebar {
+        width: 150px;
+      }
+
+      .section-title h2 {
+        font-size: 32px;
+      }
+    }
+
+    /* Warning Banner */
+    .warning-banner {
+      background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+      color: #000;
+      padding: 12px 20px;
+      text-align: center;
+      font-size: 14px;
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 200;
+    }
+
+    body.has-warning nav {
+      top: 50px;
+    }
+
+    body.has-warning .hero {
+      padding-top: 150px;
+    }
+
+    .warning-banner a {
+      color: #000;
+      font-weight: 600;
+      text-decoration: underline;
+    }
+
+    .warning-banner a:hover {
+      color: #1a1a1a;
+    }
+
+    .warning-icon {
+      margin-right: 8px;
+    }
+
+    .warning-banner code {
+      background: rgba(0,0,0,0.15);
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-family: monospace;
+      font-size: 13px;
+    }
+
+    .warning-details {
+      display: none;
+      margin-top: 10px;
+      text-align: left;
+      max-width: 600px;
+      margin-left: auto;
+      margin-right: auto;
+      background: rgba(0,0,0,0.1);
+      padding: 12px;
+      border-radius: 8px;
+    }
+
+    .warning-details.show {
+      display: block;
+    }
+
+    .warning-toggle {
+      background: none;
+      border: none;
+      color: #000;
+      font-weight: 600;
+      cursor: pointer;
+      text-decoration: underline;
+      font-size: 14px;
+    }
+  </style>
+</head>
+<body class="has-warning">
+  <div class="warning-banner">
+    <span class="warning-icon">&#9888;</span>
+    <strong>macOS Security Notice:</strong> The app is not signed (and will never be). If you see "damaged" error,
+    <button class="warning-toggle" onclick="document.getElementById('warning-details').classList.toggle('show')">click here for the fix</button>
+    <div id="warning-details" class="warning-details">
+      <p><strong>Run this command in Terminal:</strong></p>
+      <p><code>xattr -cr /Applications/SimplExplorer.app</code></p>
+      <p style="margin-top: 8px; font-size: 13px;">This removes the quarantine attribute that macOS adds to downloaded apps. After running it, you can open the app normally.</p>
+    </div>
+  </div>
+
+  <nav>
+    <div class="logo">SimplExplorer</div>
+    <div class="nav-links">
+      <a href="#features">Features</a>
+      <a href="#shortcuts">Shortcuts</a>
+      <a href="https://github.com/sh4ka/SimplExplorer">Source</a>
+    </div>
+    <a href="https://github.com/sh4ka/SimplExplorer/releases/latest" class="download-btn">Download</a>
+  </nav>
+
+  <section class="hero">
+    <div class="hero-content">
+      <span class="badge">Built for macOS</span>
+      <h1>File browsing, simplified.</h1>
+      <p>A fast, lightweight file browser with a clean interface, directory tree navigation, and powerful file management. No bloat, just what you need.</p>
+      <div class="hero-buttons">
+        <a href="https://github.com/sh4ka/SimplExplorer/releases/latest" class="btn-primary">
+          <span>Download for Mac</span>
+        </a>
+        <a href="https://github.com/sh4ka/SimplExplorer" class="btn-secondary">View Source</a>
+      </div>
+    </div>
+
+    <div class="app-preview">
+      <div class="app-window">
+        <div class="app-titlebar">
+          <span class="window-dot dot-red"></span>
+          <span class="window-dot dot-yellow"></span>
+          <span class="window-dot dot-green"></span>
+        </div>
+        <div class="app-content">
+          <div class="app-sidebar">
+            <div class="sidebar-item">Users</div>
+            <div class="sidebar-item active">Documents</div>
+            <div class="sidebar-item">Downloads</div>
+            <div class="sidebar-item">Pictures</div>
+            <div class="sidebar-item">Desktop</div>
+          </div>
+          <div class="app-files">
+            <div class="file-row">
+              <span class="file-icon">📁</span>
+              <span class="file-name">Projects</span>
+              <span class="file-meta">Jan 15, 2026</span>
+            </div>
+            <div class="file-row">
+              <span class="file-icon">📁</span>
+              <span class="file-name">Work</span>
+              <span class="file-meta">Jan 14, 2026</span>
+            </div>
+            <div class="file-row">
+              <span class="file-icon">📄</span>
+              <span class="file-name">notes.md</span>
+              <span class="file-meta">2.4 KB</span>
+            </div>
+            <div class="file-row">
+              <span class="file-icon">📕</span>
+              <span class="file-name">report.pdf</span>
+              <span class="file-meta">1.2 MB</span>
+            </div>
+            <div class="file-row">
+              <span class="file-icon">🖼️</span>
+              <span class="file-name">screenshot.png</span>
+              <span class="file-meta">340 KB</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="features" id="features">
+    <div class="section-title">
+      <h2>Everything you need</h2>
+      <p>Powerful features wrapped in a simple, intuitive interface</p>
+    </div>
+    <div class="features-grid">
+      <div class="feature-card">
+        <div class="feature-icon">🌳</div>
+        <h3>Directory Tree</h3>
+        <p>Navigate your entire file system with an expandable tree view. Click to expand, and the tree stays in sync with your navigation.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">📋</div>
+        <h3>Context Menu</h3>
+        <p>Right-click for quick actions: Open, Copy, Cut, Paste, Rename, Delete, and view Properties. All the essentials at your fingertips.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">👁️</div>
+        <h3>Hidden Files Toggle</h3>
+        <p>Instantly show or hide hidden files and folders with a single click. Perfect for developers who need access to dotfiles.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">⚡</div>
+        <h3>Lightning Fast</h3>
+        <p>Built with performance in mind. Lazy-loading directory tree means instant startup and smooth navigation.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">🎨</div>
+        <h3>Native Look</h3>
+        <p>Dark theme that feels right at home on macOS. Clean typography, smooth animations, and thoughtful design.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">🔒</div>
+        <h3>Safe Operations</h3>
+        <p>Delete sends files to Trash instead of permanent deletion. Confirmation dialogs prevent accidents.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="shortcuts" id="shortcuts">
+    <div class="shortcuts-content">
+      <div class="section-title">
+        <h2>Keyboard shortcuts</h2>
+        <p>Work faster with intuitive keyboard commands</p>
+      </div>
+      <div class="shortcuts-grid">
+        <div class="shortcut-item">
+          <span class="shortcut-label">Copy</span>
+          <div class="shortcut-keys">
+            <span class="key">⌘</span>
+            <span class="key">C</span>
+          </div>
+        </div>
+        <div class="shortcut-item">
+          <span class="shortcut-label">Cut</span>
+          <div class="shortcut-keys">
+            <span class="key">⌘</span>
+            <span class="key">X</span>
+          </div>
+        </div>
+        <div class="shortcut-item">
+          <span class="shortcut-label">Paste</span>
+          <div class="shortcut-keys">
+            <span class="key">⌘</span>
+            <span class="key">V</span>
+          </div>
+        </div>
+        <div class="shortcut-item">
+          <span class="shortcut-label">Move to Trash</span>
+          <div class="shortcut-keys">
+            <span class="key">⌘</span>
+            <span class="key">⌫</span>
+          </div>
+        </div>
+        <div class="shortcut-item">
+          <span class="shortcut-label">Go Up</span>
+          <div class="shortcut-keys">
+            <span class="key">⌫</span>
+          </div>
+        </div>
+        <div class="shortcut-item">
+          <span class="shortcut-label">Navigate</span>
+          <div class="shortcut-keys">
+            <span class="key">Enter</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="cta" id="download">
+    <div class="cta-content">
+      <h2>Ready to explore?</h2>
+      <p>Download SimplExplorer for free and experience a cleaner way to browse your files.</p>
+      <a href="https://github.com/sh4ka/SimplExplorer/releases/latest" class="btn-primary">
+        Download for macOS
+      </a>
+    </div>
+  </section>
+
+  <footer>
+    <p>Built with Electron. Open source on <a href="https://github.com/sh4ka/SimplExplorer">GitHub</a>.</p>
+    <p><a href="https://www.flaticon.com/free-icons/explore" title="explore icons">Explore icons created by RIkas Dzihab - Flaticon</a></p>
+  </footer>
+</body>
+</html>
